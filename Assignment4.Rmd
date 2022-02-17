@@ -1,0 +1,80 @@
+---
+title: "Assignment4"
+author: "Zach Rippas"
+date: "2/16/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this assignment, I'd like to look at the distribution of blue bike stations across different neighborhoods of Boston. I'm interested to see which neighborhoods have the most stations, and if the quantity of stations is proportional to the population of that neighborhood.
+
+First, let's read in the data set on the Boston neighborhoods.
+
+```{r include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(sf)
+
+#https://data.boston.gov/dataset/boston-neighborhoods1
+boston_neighborhoods <- read_sf("Boston_Neighborhoods/Boston_Neighborhoods.shp")
+```
+
+Before we do anything with blue bikes, let's plot the neghborhoods using ggplot to see what we're working with.
+```{r}
+ggplot() + geom_sf(data = boston_neighborhoods)
+```
+Now, let's read in the data set on blue bike stations as a shape file and overlay this data with the neighborhood data.
+
+```{r}
+# Data source: https://data.boston.gov/dataset/blue-bike-stations1
+blue_bikes <- read_sf("Blue_Bike_Stations/Blue_Bike_Stations.shp")
+
+ggplot() + geom_sf(data = boston_neighborhoods) + geom_sf(data = blue_bikes, size = .1)
+```
+Let's clean up our data set a little bit to get a better look at what's going on here. We only need to see the blue bike data points that are within the bounds of the Boston neighborhoods.
+
+```{r}
+#clean data to only have relevant points
+blue_bikes <- subset(blue_bikes, Latitude < 42.4 & Longitude > -71.2)
+
+#overlay points onto neighborhoods
+ggplot() + geom_sf(data = boston_neighborhoods) + geom_sf(data = blue_bikes, size = .1, color = "blue")
+```
+
+The next step is to see which neighborhoods the points fall inside of. To do this, we can transform each of our data frames using st_transform. This will allow us to use sf's intersects function. 
+```{r}
+#transform sets
+bikes_trans <- st_transform(blue_bikes, 2163)
+neighborhood_trans <- st_transform(boston_neighborhoods, 2163)
+
+#intersect data
+intersections <- blue_bikes %>% mutate(
+  neighborhood = as.integer(st_intersects(bikes_trans, neighborhood_trans)))
+
+intersections
+```
+
+This data frame now contains all of the blue bike data, with a new added attribute called intersection, which tells us which neighborhood it falls into, or NA if it doesn't.
+
+To see which neighborhoods the bike stations fall into, let's use the plyr library:
+
+```{r include=FALSE}
+library(plyr) 
+```
+
+```{r}
+count(intersections, c("neighborhood"))
+```
+From this, we can see that neighborhood 22 has the most blue bike stations with 28.
+
+If we want to observe the mean, median and other statistics on each station's neighborhood, we can use the summary method as shown next.
+```{r}
+summary(as.numeric(intersections$neighborhood))
+```
+
+Note to grader: If I had more time, I would visualize this so we could see what the neighborhoods actually are instead of just saying district x. I had quite a bit of trouble figuring out syntax for this assignment but that would have been my next step.
